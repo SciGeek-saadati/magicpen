@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Button that switches the toolbar between horizontal and vertical layouts
+
 ## 0.1.0 - 2026-10-10
 
 First release.

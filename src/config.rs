@@ -21,6 +21,8 @@ pub struct Config {
     pub toolbar: Option<(i32, i32)>,
     /// UI scale factor; 0 means derive it from the display DPI.
     pub scale: f32,
+    /// Toolbar orientation.
+    pub vertical: bool,
 }
 
 impl Default for Config {
@@ -32,6 +34,7 @@ impl Default for Config {
             hotkeys: ["Super+Shift+D".into(), "Super+Shift+H".into(), "Super+Shift+C".into()],
             toolbar: None,
             scale: 0.0,
+            vertical: false,
         }
     }
 }
@@ -64,9 +67,10 @@ impl Config {
             } else {
                 match key {
                     "tool" => cfg.tool = Tool::from_name(value).unwrap_or(cfg.tool),
-                    "color" => cfg.color = value.parse().unwrap_or(0),
+                    "color" => cfg.color = value.parse().unwrap_or(0).min(7),
                     "toolbar_x" => tx = value.parse().ok(),
                     "toolbar_y" => ty = value.parse().ok(),
+                    "vertical" => cfg.vertical = value == "true",
                     "scale" => cfg.scale = num.unwrap_or(0.0).clamp(0.0, 4.0),
                     _ => {}
                 }
@@ -89,7 +93,7 @@ impl Config {
         if let Some((x, y)) = self.toolbar {
             out += &format!("toolbar_x = {x}\ntoolbar_y = {y}\n");
         }
-        out += &format!("scale = {}\n", self.scale);
+        out += &format!("scale = {}\nvertical = {}\n", self.scale, self.vertical);
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }

@@ -10,6 +10,8 @@ Draw on top of everything on your screen. A small, fast screen-annotation overla
 
 magicpen puts a transparent layer over the whole desktop. Pick a tool and draw on any window, video or slide; switch back to the mouse and keep working while the annotations stay on screen. It is meant for presentations, screen recordings, teaching and code reviews.
 
+> **About this project.** magicpen was written by AI (Claude, through Claude Code) under my direction. I started it to cover a need of my own: I wanted an Epic Pen-style screen annotation tool on Linux. I use it myself, but treat it as a personal project: it has been tested on one machine and comes with no promises.
+
 - **Small:** a single binary of about 1 MB, with no GTK, Qt or GPU dependency.
 - **Idle means idle:** the event loop blocks on the X connection, so it uses no CPU while you are not drawing.
 - **Light on memory:** about 11 MB resident on a 1920×1080 screen.
@@ -41,7 +43,7 @@ magicpen puts a transparent layer over the whole desktop. Pick a tool and draw o
 - Global shortcuts that work from any application, rebindable in the settings panel
 - Hold `Shift` for 45° lines and arrows, squares and circles
 - Smoothed freehand strokes
-- Draggable toolbar that remembers its position
+- Draggable toolbar, horizontal or vertical, that remembers its position and layout
 - Control from scripts with `magicpen toggle`, `clear`, `undo` and so on
 - Covers all monitors; scales its interface with the display DPI
 
@@ -90,8 +92,13 @@ A toolbar appears at the top of the screen. From left to right:
 | `−` dot `+` | Shrink or grow the current tool. The dot previews the size and colour. |
 | Undo, redo, bin | Undo, redo, clear the screen. |
 | Eye | Collapse: hide the annotations and the toolbar, leaving only a small closed-eye button. Click that button to bring everything back. |
+| Bars | Switch the toolbar between a horizontal strip and a compact vertical palette. |
 | Sliders | Open the settings panel. |
 | `×` | Quit. |
+
+![The vertical toolbar](docs/vertical.png)
+
+*The same toolbar in its vertical layout.*
 
 There are two modes:
 
@@ -176,6 +183,7 @@ Settings are stored in `~/.config/magicpen/config` (or under `$XDG_CONFIG_HOME`)
 | `hotkey_hide` | `Super+Shift+H` | Hide or show the overlay |
 | `hotkey_clear` | `Super+Shift+C` | Clear the screen |
 | `toolbar_x`, `toolbar_y` | centred at the top | Toolbar position in pixels |
+| `vertical` | `false` | `true` for the vertical toolbar layout |
 | `scale` | `0` | Interface scale. `0` follows the display DPI (`Xft.dpi`); set for example `1.5` to override. |
 
 A shortcut is written as modifiers and one key joined by `+`. Modifiers are `Super`, `Ctrl`, `Alt` and `Shift`. Keys are letters, digits, punctuation, `F1`–`F12`, and `Space`, `Escape`, `Tab`, `Enter`, `Backspace`, `Delete`, `Insert`, `Home`, `End`, `PageUp`, `PageDown`, `Left`, `Right`, `Up`, `Down`, `Print`, `Pause`.

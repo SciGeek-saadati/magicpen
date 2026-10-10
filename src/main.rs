@@ -256,8 +256,9 @@ impl App {
 
         let cfg = Config::load();
         let scale = if cfg.scale > 0.0 { cfg.scale } else { detect_scale(&conn, root) };
-        let ui = Ui::new(scale);
-        let tb_pos = cfg.toolbar.unwrap_or(((sw - ui.tb.0) / 2, ui.margin * 2));
+        let ui = Ui::new(scale, cfg.vertical);
+        let home = if cfg.vertical { (ui.margin * 2, (sh - ui.tb.1) / 2) } else { ((sw - ui.tb.0) / 2, ui.margin * 2) };
+        let tb_pos = cfg.toolbar.unwrap_or(home);
         let keymap = Keymap::load(&conn)?;
         let max_req = conn.maximum_request_bytes();
 
@@ -326,14 +327,20 @@ impl App {
         R::new(self.tb_pos.0, self.tb_pos.1, self.ui.tb.0, self.ui.tb.1)
     }
 
-    /// The settings panel hangs below the toolbar, or above it near the screen bottom.
+    /// The settings panel hangs below a horizontal toolbar and beside a vertical
+    /// one, flipping to the other side when there is no room.
     fn panel_rect(&self) -> R {
-        let tb = self.tb_rect();
+        let (tb, gap) = (self.tb_rect(), self.ui.margin);
         let (w, h) = self.ui.panel;
-        let x = tb.x.clamp(0, (self.sw - w).max(0));
-        let below = tb.y + tb.h + self.ui.margin;
-        let y = if below + h <= self.sh { below } else { (tb.y - self.ui.margin - h).max(0) };
-        R::new(x, y, w, h)
+        let (max_x, max_y) = ((self.sw - w).max(0), (self.sh - h).max(0));
+        if self.cfg.vertical {
+            let right = tb.x + tb.w + gap;
+            let x = if right + w <= self.sw { right } else { (tb.x - gap - w).max(0) };
+            return R::new(x, tb.y.clamp(0, max_y), w, h);
+        }
+        let below = tb.y + tb.h + gap;
+        let y = if below + h <= self.sh { below } else { (tb.y - gap - h).max(0) };
+        R::new(tb.x.clamp(0, max_x), y, w, h)
     }
 
     /// A widget's rectangle grown by the shadow margin its pixmap carries.
@@ -345,10 +352,11 @@ impl App {
     /// Where the eye button sits while collapsed: over the toolbar's own eye, so
     /// collapsing and expanding need no pointer movement.
     fn eye_rect(&self) -> R {
-        let (tb, side) = (self.tb_rect(), self.ui.tb.1);
+        let (tb, side) = (self.tb_rect(), self.ui.eye);
         let hide = self.ui.item_rect(Item::Hide);
         let x = tb.x + hide.x + hide.w / 2 - side / 2;
-        R::new(x.clamp(0, (self.sw - side).max(0)), tb.y, side, side)
+        let y = tb.y + hide.y + hide.h / 2 - side / 2;
+        R::new(x.clamp(0, (self.sw - side).max(0)), y.clamp(0, (self.sh - side).max(0)), side, side)
     }
 
     fn over_ui(&self, x: i32, y: i32) -> bool {
@@ -504,6 +512,19 @@ impl App {
         self.sync_input_shape();
     }
 
+    /// Switch the toolbar between a horizontal strip and a vertical palette.
+    fn set_vertical(&mut self, vertical: bool) {
+        self.damage_ui();
+        self.cfg.vertical = vertical;
+        self.ui.set_vertical(vertical);
+        self.tb_pos = self.clamp_toolbar(self.tb_pos);
+        self.cfg.toolbar = Some(self.tb_pos);
+        self.cfg_dirty = true;
+        self.hover = None;
+        self.ui_dirty = true;
+        self.sync_input_shape();
+    }
+
     fn toggle_draw(&mut self) {
         let on = !self.visible || self.collapsed || !self.draw_mode;
         self.set_visible(true);
@@ -587,6 +608,7 @@ impl App {
             Item::Redo => self.redo(),
             Item::Clear => self.clear(),
             Item::Hide => self.set_collapsed(true),
+            Item::Orient => self.set_vertical(!self.cfg.vertical),
             Item::Show => self.set_collapsed(false),
             Item::Settings => self.set_panel_open(!self.panel_open),
             Item::Quit => self.quit = true,

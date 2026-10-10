@@ -33,6 +33,8 @@ pub enum Item {
     Clear,
     /// Collapse the overlay to a single eye button.
     Hide,
+    /// Switch the toolbar between horizontal and vertical.
+    Orient,
     /// The collapsed eye button itself; never part of the toolbar.
     Show,
     Settings,
@@ -62,6 +64,8 @@ pub struct Ui {
     items: Vec<(Item, R)>,
     preview: R,
     pub tb: (i32, i32),
+    /// Side of the square eye button shown while collapsed.
+    pub eye: i32,
     pub panel: (i32, i32),
     pub margin: i32,
     font: OnceCell<Option<Font>>,
@@ -74,50 +78,102 @@ const ROWS_TOP: f32 = 44.0;
 const CTRL_X: f32 = 160.0;
 
 impl Ui {
-    pub fn new(s: f32) -> Ui {
+    pub fn new(s: f32, vertical: bool) -> Ui {
         let px = |v: f32| (v * s).round() as i32;
-        enum Spec {
-            It(Item, f32),
-            Sep,
-            Preview,
-        }
-        let mut spec = vec![Spec::It(Item::Grip, 18.0), Spec::It(Item::Cursor, 34.0), Spec::Sep];
-        spec.extend(Tool::ALL.map(|t| Spec::It(Item::Tool(t), 34.0)));
-        spec.push(Spec::Sep);
-        spec.extend((0..PALETTE.len()).map(|i| Spec::It(Item::Color(i), 26.0)));
-        spec.extend([Spec::Sep, Spec::It(Item::SizeDown, 26.0), Spec::Preview, Spec::It(Item::SizeUp, 26.0)]);
-        spec.push(Spec::Sep);
-        spec.extend([Item::Undo, Item::Redo, Item::Clear].map(|i| Spec::It(i, 34.0)));
-        spec.push(Spec::Sep);
-        spec.extend([Item::Hide, Item::Settings, Item::Quit].map(|i| Spec::It(i, 34.0)));
-
-        let (pad, btn) = (px(6.0), px(34.0));
-        let mut x = pad;
-        let mut items = Vec::new();
-        let mut preview = R::default();
-        for sp in spec {
-            match sp {
-                Spec::It(item, w) => {
-                    items.push((item, R::new(x, pad, px(w), btn)));
-                    x += px(w);
-                }
-                Spec::Sep => x += px(9.0),
-                Spec::Preview => {
-                    preview = R::new(x, pad, px(30.0), btn);
-                    x += px(30.0);
-                }
-            }
-        }
         let panel_h = ROWS_TOP + ROW_H * 7.0 + 8.0 + 52.0;
-        Ui {
+        let mut ui = Ui {
             s,
-            items,
-            preview,
-            tb: (x + pad, btn + 2 * pad),
+            items: Vec::new(),
+            preview: R::default(),
+            tb: (0, 0),
+            eye: px(46.0),
             panel: (px(PANEL_W), px(panel_h)),
             margin: px(12.0),
             font: OnceCell::new(),
+        };
+        ui.set_vertical(vertical);
+        ui
+    }
+
+    /// Lay the toolbar out as one horizontal strip, or as a compact two-column vertical palette.
+    pub fn set_vertical(&mut self, vertical: bool) {
+        let s = self.s;
+        let px = |v: f32| (v * s).round() as i32;
+        #[derive(Clone, Copy)]
+        enum Cell {
+            It(Item),
+            Preview,
+            Gap,
         }
+        use Cell::It;
+        // Each row is its cells with their widths, plus the row height; `None` is a gap between groups.
+        type Row = Option<(Vec<(Cell, f32)>, f32)>;
+        let tools: Vec<Cell> = Tool::ALL.map(|t| It(Item::Tool(t))).to_vec();
+        let colors: Vec<Cell> = (0..PALETTE.len()).map(|i| It(Item::Color(i))).collect();
+        let size = [(It(Item::SizeDown), 26.0), (Cell::Preview, 30.0), (It(Item::SizeUp), 26.0)];
+        let each = |cells: &[Cell], w: f32| cells.iter().map(|c| (*c, w)).collect::<Vec<_>>();
+
+        let rows: Vec<Row> = if vertical {
+            let pairs = |cells: &[Cell], h: f32| -> Vec<Row> {
+                cells.chunks(2).map(|pair| Some((each(pair, 34.0), h))).collect()
+            };
+            let mut rows = vec![Some((vec![(It(Item::Grip), 68.0)], 18.0))];
+            rows.extend(pairs(&[&[It(Item::Cursor)][..], &tools].concat(), 34.0));
+            rows.push(None);
+            rows.extend(pairs(&colors, 26.0));
+            rows.push(None);
+            rows.push(Some((vec![(size[0].0, 22.0), (size[1].0, 24.0), (size[2].0, 22.0)], 34.0)));
+            rows.push(None);
+            let actions = [Item::Undo, Item::Redo, Item::Clear, Item::Hide, Item::Orient, Item::Settings].map(It);
+            rows.extend(pairs(&actions, 34.0));
+            rows.push(Some((vec![(It(Item::Quit), 68.0)], 34.0)));
+            rows
+        } else {
+            let mut row = vec![(It(Item::Grip), 18.0), (It(Item::Cursor), 34.0)];
+            let mut gaps = vec![row.len()];
+            for group in [
+                each(&tools, 34.0),
+                each(&colors, 26.0),
+                size.to_vec(),
+                each(&[Item::Undo, Item::Redo, Item::Clear].map(It), 34.0),
+                each(&[Item::Hide, Item::Orient, Item::Settings, Item::Quit].map(It), 34.0),
+            ] {
+                row.extend(group);
+                gaps.push(row.len());
+            }
+            // A horizontal toolbar is a single row, with gaps between the groups.
+            let mut cells = Vec::new();
+            for (i, cell) in row.into_iter().enumerate() {
+                if i > 0 && gaps.contains(&i) {
+                    cells.push((Cell::Gap, 9.0));
+                }
+                cells.push(cell);
+            }
+            vec![Some((cells, 34.0))]
+        };
+
+        let pad = px(6.0);
+        let (mut y, mut width) = (pad, 0);
+        self.items.clear();
+        for row in rows {
+            let Some((cells, h)) = row else {
+                y += px(9.0);
+                continue;
+            };
+            let mut x = pad;
+            for (cell, w) in cells {
+                let r = R::new(x, y, px(w), px(h));
+                match cell {
+                    It(item) => self.items.push((item, r)),
+                    Cell::Preview => self.preview = r,
+                    Cell::Gap => {}
+                }
+                x += px(w);
+            }
+            width = width.max(x);
+            y += px(h);
+        }
+        self.tb = (width + pad, y + pad);
     }
 
     pub fn item_at(&self, x: i32, y: i32) -> Option<Item> {
@@ -128,9 +184,9 @@ impl Ui {
         self.items.iter().find(|(i, _)| *i == item).map(|(_, r)| *r).unwrap_or_default()
     }
 
-    /// The square button left on screen while the overlay is collapsed; `tb.1` pixels on a side.
+    /// The square button left on screen while the overlay is collapsed.
     pub fn draw_eye(&self, hover: bool) -> Pixmap {
-        let (s, m, side) = (self.s, self.margin, self.tb.1);
+        let (s, m, side) = (self.s, self.margin, self.eye);
         let mut pm = Pixmap::new((side + 2 * m) as u32, (side + 2 * m) as u32).expect("eye size");
         backdrop(&mut pm, m as f32, side as f32, side as f32, 12.0 * s);
         let btn = (34.0 * s).round() as i32;
@@ -415,8 +471,10 @@ fn icon(pm: &mut Pixmap, item: Item, r: R, s: f32) {
     match item {
         Item::Grip => {
             color = [255, 255, 255, 90];
-            for cx in [6.0, 12.0] {
-                for cy in [11.0, 17.0, 23.0] {
+            // Two rows of dots along the grip's long side.
+            for a in [6.0, 12.0] {
+                for b in [11.0, 17.0, 23.0] {
+                    let (cx, cy) = if r.w > r.h { (b, a) } else { (a, b) };
                     fl.push_circle(cx, cy, 1.5);
                 }
             }
@@ -488,6 +546,16 @@ fn icon(pm: &mut Pixmap, item: Item, r: R, s: f32) {
             st.quad_to(17.0, 29.0, 6.0, 17.0);
             fl.push_circle(17.0, 17.0, 3.4);
         }
+        Item::Orient => {
+            // A tall bar and a wide bar: the two toolbar orientations.
+            for (l, t, r, b) in [(8.0, 7.0, 14.0, 27.0), (17.5, 21.0, 27.0, 27.0)] {
+                if let Some(rect) = Rect::from_ltrb(l, t, r, b) {
+                    st.push_rect(rect);
+                }
+            }
+            poly(&mut st, &[(19.0, 8.0), (26.0, 8.0), (26.0, 15.0)], false);
+            poly(&mut st, &[(26.0, 8.0), (19.0, 15.0)], false);
+        }
         Item::Show => {
             // A closed eye: the lower lid with lashes.
             st.move_to(6.0, 14.5);
@@ -502,7 +570,15 @@ fn icon(pm: &mut Pixmap, item: Item, r: R, s: f32) {
         }
         Item::Color(_) => {}
     }
-    let ts = Transform::from_scale(s, s).post_translate(r.x as f32, r.y as f32);
+    // Size of the grid the icon was authored on; centre that grid in the button.
+    let (aw, ah) = match item {
+        Item::Grip if r.w > r.h => (34.0, 18.0),
+        Item::Grip => (18.0, 34.0),
+        Item::SizeDown | Item::SizeUp => (26.0, 34.0),
+        _ => (34.0, 34.0),
+    };
+    let (tx, ty) = (r.x as f32 + (r.w as f32 - aw * s) / 2.0, r.y as f32 + (r.h as f32 - ah * s) / 2.0);
+    let ts = Transform::from_scale(s, s).post_translate(tx, ty);
     if let Some(path) = fl.finish() {
         pm.fill_path(&path, &paint(color), FillRule::Winding, ts, None);
     }
