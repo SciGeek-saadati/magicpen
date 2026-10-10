@@ -37,6 +37,7 @@ magicpen puts a transparent layer over the whole desktop. Pick a tool and draw o
 - Eight colours and adjustable sizes, with a live size preview in the toolbar
 - Undo and redo, including undo of "clear screen"
 - Click-through when you are not drawing: the mouse reaches the windows below
+- One-click collapse to a small eye button, and back
 - Global shortcuts that work from any application, rebindable in the settings panel
 - Hold `Shift` for 45° lines and arrows, squares and circles
 - Smoothed freehand strokes
@@ -88,6 +89,7 @@ A toolbar appears at the top of the screen. From left to right:
 | Colour dots | Select a colour. |
 | `−` dot `+` | Shrink or grow the current tool. The dot previews the size and colour. |
 | Undo, redo, bin | Undo, redo, clear the screen. |
+| Eye | Collapse: hide the annotations and the toolbar, leaving only a small closed-eye button. Click that button to bring everything back. |
 | Sliders | Open the settings panel. |
 | `×` | Quit. |
 
@@ -96,7 +98,9 @@ There are two modes:
 - **Mouse mode** (the default). Annotations stay visible, but only the toolbar reacts to the mouse. Everything else behaves as if magicpen were not there.
 - **Drawing mode.** The overlay takes the mouse and the keyboard. Leave it with `Esc`, the arrow button, or the toggle shortcut.
 
-Annotations live in memory only: hiding the overlay keeps them, quitting discards them.
+Annotations live in memory only: collapsing or hiding the overlay keeps them, quitting discards them.
+
+The eye button and the hide shortcut differ: the eye leaves a button on screen to click, while the shortcut removes the overlay completely until you press it again. Starting to draw with the toggle shortcut also expands a collapsed overlay.
 
 ## Keyboard shortcuts
 

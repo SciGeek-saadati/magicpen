@@ -8,5 +8,6 @@ First release.
 - Pen, highlighter, line, arrow, rectangle, ellipse and eraser tools
 - Eight colours, adjustable sizes, undo and redo
 - Click-through mouse mode
+- Eye button that collapses the overlay to a single closed-eye button and restores it on click
 - Rebindable global shortcuts and a settings panel
 - Command-line control of the running instance

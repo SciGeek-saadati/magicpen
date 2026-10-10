@@ -75,6 +75,9 @@ struct App {
     tb_pos: (i32, i32),
     tb_pix: Pixmap,
     panel_pix: Option<Pixmap>,
+    /// Everything is hidden except a small eye button that brings it back.
+    collapsed: bool,
+    eye_pix: Option<Pixmap>,
     panel_open: bool,
     ui_dirty: bool,
     hover: Option<Item>,
@@ -276,6 +279,8 @@ impl App {
             tb_pos,
             tb_pix: Pixmap::new(1, 1).unwrap(),
             panel_pix: None,
+            collapsed: false,
+            eye_pix: None,
             panel_open: false,
             ui_dirty: true,
             hover: None,
@@ -337,7 +342,19 @@ impl App {
         R::new(r.x - m, r.y - m, r.w + 2 * m, r.h + 2 * m)
     }
 
+    /// Where the eye button sits while collapsed: over the toolbar's own eye, so
+    /// collapsing and expanding need no pointer movement.
+    fn eye_rect(&self) -> R {
+        let (tb, side) = (self.tb_rect(), self.ui.tb.1);
+        let hide = self.ui.item_rect(Item::Hide);
+        let x = tb.x + hide.x + hide.w / 2 - side / 2;
+        R::new(x.clamp(0, (self.sw - side).max(0)), tb.y, side, side)
+    }
+
     fn over_ui(&self, x: i32, y: i32) -> bool {
+        if self.collapsed {
+            return self.eye_rect().contains(x, y);
+        }
         self.tb_rect().contains(x, y) || (self.panel_open && self.panel_rect().contains(x, y))
     }
 
@@ -357,6 +374,10 @@ impl App {
     }
 
     fn damage_ui(&mut self) {
+        if self.collapsed {
+            self.damage(self.outer(self.eye_rect()));
+            return;
+        }
         self.damage(self.outer(self.tb_rect()));
         if self.panel_open {
             self.damage(self.outer(self.panel_rect()));
@@ -370,7 +391,9 @@ impl App {
     fn sync_input_shape(&self) {
         let rect = |r: R| Rectangle { x: r.x as i16, y: r.y as i16, width: r.w as u16, height: r.h as u16 };
         let mut rects = Vec::new();
-        if self.draw_mode {
+        if self.collapsed {
+            rects.push(rect(self.eye_rect()));
+        } else if self.draw_mode {
             rects.push(rect(R::new(0, 0, self.sw, self.sh)));
         } else {
             rects.push(rect(self.tb_rect()));
@@ -463,9 +486,28 @@ impl App {
         self.sync_keyboard_grab();
     }
 
+    /// Collapse to just the eye button (annotations and toolbar hidden), or expand again.
+    fn set_collapsed(&mut self, on: bool) {
+        if on == self.collapsed {
+            return;
+        }
+        if on {
+            self.set_draw(false);
+            if self.panel_open {
+                self.set_panel_open(false);
+            }
+        }
+        self.collapsed = on;
+        self.hover = None;
+        self.ui_dirty = true;
+        self.damage_all();
+        self.sync_input_shape();
+    }
+
     fn toggle_draw(&mut self) {
-        let on = !self.visible || !self.draw_mode;
+        let on = !self.visible || self.collapsed || !self.draw_mode;
         self.set_visible(true);
+        self.set_collapsed(false);
         self.set_draw(on);
     }
 
@@ -544,6 +586,8 @@ impl App {
             Item::Undo => self.undo(),
             Item::Redo => self.redo(),
             Item::Clear => self.clear(),
+            Item::Hide => self.set_collapsed(true),
+            Item::Show => self.set_collapsed(false),
             Item::Settings => self.set_panel_open(!self.panel_open),
             Item::Quit => self.quit = true,
         }
@@ -597,6 +641,13 @@ impl App {
                 return;
             }
             _ => return,
+        }
+
+        if self.collapsed {
+            if self.eye_rect().contains(x, y) {
+                self.set_collapsed(false);
+            }
+            return;
         }
 
         let panel = self.panel_rect();
@@ -676,7 +727,11 @@ impl App {
             }
             Drag::None => {
                 let tb = self.tb_rect();
-                let hover = self.ui.item_at(x - tb.x, y - tb.y).filter(|i| *i != Item::Grip);
+                let hover = if self.collapsed {
+                    self.eye_rect().contains(x, y).then_some(Item::Show)
+                } else {
+                    self.ui.item_at(x - tb.x, y - tb.y).filter(|i| *i != Item::Grip)
+                };
                 if hover != self.hover {
                     self.hover = hover;
                     self.ui_dirty = true;
@@ -813,6 +868,7 @@ impl App {
             let panel = self.panel_open.then(|| self.ui.draw_panel(&view));
             self.tb_pix = toolbar;
             self.panel_pix = panel;
+            self.eye_pix = self.collapsed.then(|| self.ui.draw_eye(self.hover == Some(Item::Show)));
             self.damage_ui();
         }
         for r in std::mem::take(&mut self.damage) {
@@ -837,9 +893,13 @@ impl App {
 
         let base = self.canvas.base.data();
         let stride = self.sw as usize * 4;
-        for (row, out) in buf.chunks_exact_mut(row_bytes).enumerate() {
-            let start = (r.y as usize + row) * stride + r.x as usize * 4;
-            out.copy_from_slice(&base[start..start + row_bytes]);
+        if self.collapsed {
+            buf.fill(0);
+        } else {
+            for (row, out) in buf.chunks_exact_mut(row_bytes).enumerate() {
+                let start = (r.y as usize + row) * stride + r.x as usize * 4;
+                out.copy_from_slice(&base[start..start + row_bytes]);
+            }
         }
 
         {
@@ -865,9 +925,13 @@ impl App {
                     pm.draw_pixmap(at.x - r.x, at.y - r.y, pix.as_ref(), &paint, Transform::identity(), None);
                 }
             };
-            blit(self.outer(self.tb_rect()), &self.tb_pix);
-            if let (true, Some(pix)) = (self.panel_open, &self.panel_pix) {
-                blit(self.outer(self.panel_rect()), pix);
+            if let (true, Some(pix)) = (self.collapsed, &self.eye_pix) {
+                blit(self.outer(self.eye_rect()), pix);
+            } else {
+                blit(self.outer(self.tb_rect()), &self.tb_pix);
+                if let (true, Some(pix)) = (self.panel_open, &self.panel_pix) {
+                    blit(self.outer(self.panel_rect()), pix);
+                }
             }
         }
 

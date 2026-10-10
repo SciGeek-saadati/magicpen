@@ -31,6 +31,10 @@ pub enum Item {
     Undo,
     Redo,
     Clear,
+    /// Collapse the overlay to a single eye button.
+    Hide,
+    /// The collapsed eye button itself; never part of the toolbar.
+    Show,
     Settings,
     Quit,
 }
@@ -85,7 +89,7 @@ impl Ui {
         spec.push(Spec::Sep);
         spec.extend([Item::Undo, Item::Redo, Item::Clear].map(|i| Spec::It(i, 34.0)));
         spec.push(Spec::Sep);
-        spec.extend([Item::Settings, Item::Quit].map(|i| Spec::It(i, 34.0)));
+        spec.extend([Item::Hide, Item::Settings, Item::Quit].map(|i| Spec::It(i, 34.0)));
 
         let (pad, btn) = (px(6.0), px(34.0));
         let mut x = pad;
@@ -118,6 +122,32 @@ impl Ui {
 
     pub fn item_at(&self, x: i32, y: i32) -> Option<Item> {
         self.items.iter().find(|(_, r)| r.contains(x, y)).map(|(i, _)| *i)
+    }
+
+    pub fn item_rect(&self, item: Item) -> R {
+        self.items.iter().find(|(i, _)| *i == item).map(|(_, r)| *r).unwrap_or_default()
+    }
+
+    /// The square button left on screen while the overlay is collapsed; `tb.1` pixels on a side.
+    pub fn draw_eye(&self, hover: bool) -> Pixmap {
+        let (s, m, side) = (self.s, self.margin, self.tb.1);
+        let mut pm = Pixmap::new((side + 2 * m) as u32, (side + 2 * m) as u32).expect("eye size");
+        backdrop(&mut pm, m as f32, side as f32, side as f32, 12.0 * s);
+        let btn = (34.0 * s).round() as i32;
+        let r = R::new(m + (side - btn) / 2, m + (side - btn) / 2, btn, btn);
+        if hover {
+            let inset = 2.0 * s;
+            let path = rrect(
+                r.x as f32 + inset,
+                r.y as f32 + inset,
+                r.w as f32 - 2.0 * inset,
+                r.h as f32 - 2.0 * inset,
+                7.0 * s,
+            );
+            fill(&mut pm, path.as_ref(), [255, 255, 255, 34]);
+        }
+        icon(&mut pm, Item::Show, r, s);
+        pm
     }
 
     fn row_y(&self, row: usize) -> f32 {
@@ -451,6 +481,20 @@ fn icon(pm: &mut Pixmap, item: Item, r: R, s: f32) {
                 poly(&mut st, &[(8.0, y), (26.0, y)], false);
                 fl.push_circle(knob, y, 2.8);
             }
+        }
+        Item::Hide => {
+            st.move_to(6.0, 17.0);
+            st.quad_to(17.0, 5.0, 28.0, 17.0);
+            st.quad_to(17.0, 29.0, 6.0, 17.0);
+            fl.push_circle(17.0, 17.0, 3.4);
+        }
+        Item::Show => {
+            // A closed eye: the lower lid with lashes.
+            st.move_to(6.0, 14.5);
+            st.quad_to(17.0, 26.0, 28.0, 14.5);
+            poly(&mut st, &[(10.0, 19.0), (8.0, 22.5)], false);
+            poly(&mut st, &[(17.0, 20.5), (17.0, 24.5)], false);
+            poly(&mut st, &[(24.0, 19.0), (26.0, 22.5)], false);
         }
         Item::Quit => {
             poly(&mut st, &[(10.5, 10.5), (23.5, 23.5)], false);
