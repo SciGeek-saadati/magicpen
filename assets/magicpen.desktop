@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=magicpen
+GenericName=Screen Annotation
+Comment=Draw on top of everything on your screen
+Exec=magicpen
+Icon=applications-graphics
+Terminal=false
+Categories=Utility;
+Keywords=draw;annotate;pen;screen;presentation;
+StartupNotify=false

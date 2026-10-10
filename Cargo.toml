@@ -1,0 +1,24 @@
+[package]
+name = "magicpen"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+description = "Draw on top of everything on your screen: a lightweight annotation overlay for X11"
+authors = ["SciGeek"]
+license = "MIT"
+readme = "README.md"
+keywords = ["annotation", "overlay", "x11", "drawing", "presentation"]
+categories = ["graphics", "command-line-utilities"]
+exclude = ["/.github", "/docs"]
+
+[dependencies]
+x11rb = { version = "0.13", features = ["shape"] }
+tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
+fontdue = "0.9"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
