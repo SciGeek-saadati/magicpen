@@ -43,7 +43,15 @@ magicpen روی Xfce توسعه داده شده. بقیهٔ مدیر پنجره�
 
 ## نصب
 
-مخزن را clone کن و بعد با Cargo نصب کن:
+بسته‌های آماده برای x86_64، aarch64، armv7 و i686 در [صفحهٔ انتشارها](https://github.com/SciGeek-saadati/magicpen/releases) هستند: یک `.deb`، یک AppImage و یک tarball که فقط فایل اجرایی را دارد. فایل‌های اجرایی به‌صورت ایستا لینک شده‌اند و روی هر توزیعی اجرا می‌شوند.
+
+```sh
+sudo apt install ./magicpen_*_amd64.deb
+# یا
+chmod +x magicpen-*-x86_64.AppImage && ./magicpen-*-x86_64.AppImage
+```
+
+برای ساختن از سورس، مخزن را clone کن و بعد با Cargo نصب کن:
 
 ```sh
 cargo install --path . --locked

@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Button that switches the toolbar between horizontal and vertical layouts
+- Prebuilt `.deb`, AppImage and static binaries for x86_64, aarch64, armv7 and i686
+- Application icon
 
 ## 0.1.0 - 2026-10-10
 

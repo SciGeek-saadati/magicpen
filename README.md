@@ -58,7 +58,15 @@ magicpen is developed on Xfce. Other compositing window managers should work but
 
 ## Install
 
-Clone this repository, then either install with Cargo:
+Prebuilt packages for x86_64, aarch64, armv7 and i686 are on the [releases page](https://github.com/SciGeek-saadati/magicpen/releases): a `.deb`, an AppImage and a tarball with the bare binary. The binaries are statically linked, so they run on any distribution.
+
+```sh
+sudo apt install ./magicpen_*_amd64.deb
+# or
+chmod +x magicpen-*-x86_64.AppImage && ./magicpen-*-x86_64.AppImage
+```
+
+To build from source, clone this repository, then either install with Cargo:
 
 ```sh
 cargo install --path . --locked
